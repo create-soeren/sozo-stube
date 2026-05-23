@@ -249,4 +249,4 @@ export function Wohnzimmer({ modelPath, slotColors, activeFloorId, floorRotated 
   return <primitive object={cloned} />;
 }
 
-useGLTF.preload('/models/wohnzimmer.glb');
+useGLTF.preload(`${import.meta.env.BASE_URL}models/wohnzimmer.glb`);

@@ -245,7 +245,7 @@ export default function App() {
             color="#E8E3D4"
           />
           <Wohnzimmer
-            modelPath="/models/wohnzimmer.glb"
+            modelPath={`${import.meta.env.BASE_URL}models/wohnzimmer.glb`}
             slotColors={slotColors}
             activeFloorId={activeFloorId}
             floorRotated={floorRotated}

@@ -18,9 +18,9 @@ export type FloorTexture = {
 // Alle Farbvarianten teilen dieselbe Diffuse+Normal-Basis, die Tönung kommt per Color-Tint.
 // Quelle: polyhaven.com/a/plank_flooring_02 (CC0), 2K JPG.
 export const BASE_FLOOR_TEXTURE = {
-  diffuse: '/textures/vinyl/_base/diffuse.jpg',
-  normal: '/textures/vinyl/_base/normal.jpg',
-  ao: '/textures/vinyl/_base/ao.jpg',
+  diffuse: `${import.meta.env.BASE_URL}textures/vinyl/_base/diffuse.jpg`,
+  normal: `${import.meta.env.BASE_URL}textures/vinyl/_base/normal.jpg`,
+  ao: `${import.meta.env.BASE_URL}textures/vinyl/_base/ao.jpg`,
   // GLB hat keine UVs — wir generieren UVs zur Laufzeit aus Welt-Koordinaten
   // (in Metern). Repeat = Wiederholungen pro Meter.
   // Polyhaven plank_flooring_02 zeigt ~5 Planken pro Bild → repeat 1 = 1 Bild

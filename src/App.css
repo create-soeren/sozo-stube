@@ -16,6 +16,7 @@ input { font-family: inherit; }
   display: grid;
   grid-template-columns: 1fr 380px;
   height: 100vh;
+  height: 100dvh;
   width: 100vw;
 }
 
@@ -31,6 +32,7 @@ input { font-family: inherit; }
   flex-direction: column;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 .picker-header {
@@ -390,8 +392,8 @@ input { font-family: inherit; }
 
 .touch-dpad {
   position: absolute;
-  bottom: 24px;
-  left: 24px;
+  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  left: calc(24px + env(safe-area-inset-left, 0px));
   display: grid;
   grid-template-columns: 44px 44px 44px;
   grid-template-rows: 44px 44px 44px;

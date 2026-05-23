@@ -3,6 +3,7 @@ import { Canvas } from '@react-three/fiber';
 import * as THREE from 'three';
 import { Wohnzimmer } from './components/Wohnzimmer';
 import { Couch, COUCH_HALF_X, COUCH_HALF_Z } from './components/Couch';
+import { TouchDPad } from './components/TouchDPad';
 
 // Boden-Bounds (aus GLB-Inspektion): X 0..5.52, Z 0..3.89.
 // Couch darf nicht in die Wände schwingen — effective Halbbreite/Halbtiefe
@@ -254,6 +255,7 @@ export default function App() {
           <NavControls />
         </Canvas>
         <HelpOverlay />
+        <TouchDPad />
       </div>
       <MaterialPicker
         slotColors={slotColors}

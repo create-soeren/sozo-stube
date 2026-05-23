@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
+import { viewerInput } from '../viewerInput';
 
 const EYE_HEIGHT = 1.65;
 const MOVE_SPEED = 2.2;
@@ -72,7 +73,6 @@ export function NavControls() {
   const lastMouse = useRef({ x: 0, y: 0 });
   const yaw = useRef(0);
   const pitch = useRef(0);
-  const keys = useRef({ forward: 0, right: 0 });
 
   useEffect(() => {
     // Startposition: Raummitte, Augenhöhe, Blick nach +X (Richtung Ost)
@@ -108,19 +108,19 @@ export function NavControls() {
       switch (e.code) {
         case 'ArrowUp':
         case 'KeyW':
-          keys.current.forward = 1;
+          viewerInput.forward = 1;
           break;
         case 'ArrowDown':
         case 'KeyS':
-          keys.current.forward = -1;
+          viewerInput.forward = -1;
           break;
         case 'ArrowLeft':
         case 'KeyA':
-          keys.current.right = -1;
+          viewerInput.right = -1;
           break;
         case 'ArrowRight':
         case 'KeyD':
-          keys.current.right = 1;
+          viewerInput.right = 1;
           break;
       }
     };
@@ -130,21 +130,48 @@ export function NavControls() {
         case 'KeyW':
         case 'ArrowDown':
         case 'KeyS':
-          keys.current.forward = 0;
+          viewerInput.forward = 0;
           break;
         case 'ArrowLeft':
         case 'KeyA':
         case 'ArrowRight':
         case 'KeyD':
-          keys.current.right = 0;
+          viewerInput.right = 0;
           break;
       }
+    };
+
+    // Touch: Ein-Finger-Drag = Drehen (analog Maus). preventDefault verhindert
+    // dass der Browser den Viewport scrollt während der Drag im Canvas läuft.
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length !== 1) return;
+      e.preventDefault();
+      dragging.current = true;
+      lastMouse.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      if (!dragging.current || e.touches.length !== 1) return;
+      e.preventDefault();
+      const t = e.touches[0];
+      const dx = t.clientX - lastMouse.current.x;
+      const dy = t.clientY - lastMouse.current.y;
+      lastMouse.current = { x: t.clientX, y: t.clientY };
+      yaw.current -= dx * MOUSE_SENSITIVITY;
+      pitch.current -= dy * MOUSE_SENSITIVITY;
+      pitch.current = Math.max(-Math.PI / 2 + 0.05, Math.min(Math.PI / 2 - 0.05, pitch.current));
+    };
+    const onTouchEnd = () => {
+      dragging.current = false;
     };
 
     dom.style.cursor = 'grab';
     dom.addEventListener('mousedown', onMouseDown);
     window.addEventListener('mouseup', onMouseUp);
     window.addEventListener('mousemove', onMouseMove);
+    dom.addEventListener('touchstart', onTouchStart, { passive: false });
+    dom.addEventListener('touchmove', onTouchMove, { passive: false });
+    dom.addEventListener('touchend', onTouchEnd);
+    dom.addEventListener('touchcancel', onTouchEnd);
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
 
@@ -152,6 +179,10 @@ export function NavControls() {
       dom.removeEventListener('mousedown', onMouseDown);
       window.removeEventListener('mouseup', onMouseUp);
       window.removeEventListener('mousemove', onMouseMove);
+      dom.removeEventListener('touchstart', onTouchStart);
+      dom.removeEventListener('touchmove', onTouchMove);
+      dom.removeEventListener('touchend', onTouchEnd);
+      dom.removeEventListener('touchcancel', onTouchEnd);
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
     };
@@ -161,7 +192,7 @@ export function NavControls() {
     const euler = new THREE.Euler(pitch.current, yaw.current, 0, 'YXZ');
     camera.quaternion.setFromEuler(euler);
 
-    if (keys.current.forward === 0 && keys.current.right === 0) return;
+    if (viewerInput.forward === 0 && viewerInput.right === 0) return;
 
     const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
     forward.y = 0;
@@ -171,8 +202,8 @@ export function NavControls() {
     right.normalize();
 
     const step = MOVE_SPEED * delta;
-    const dx = forward.x * keys.current.forward * step + right.x * keys.current.right * step;
-    const dz = forward.z * keys.current.forward * step + right.z * keys.current.right * step;
+    const dx = forward.x * viewerInput.forward * step + right.x * viewerInput.right * step;
+    const dz = forward.z * viewerInput.forward * step + right.z * viewerInput.right * step;
 
     // Axis-separated collision: try X then Z separately so we glide along walls
     const newX = camera.position.x + dx;

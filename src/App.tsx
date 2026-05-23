@@ -2,7 +2,28 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
 import * as THREE from 'three';
 import { Wohnzimmer } from './components/Wohnzimmer';
-import { Couch } from './components/Couch';
+import { Couch, COUCH_HALF_X, COUCH_HALF_Z } from './components/Couch';
+
+// Boden-Bounds (aus GLB-Inspektion): X 0..5.52, Z 0..3.89.
+// Couch darf nicht in die Wände schwingen — effective Halbbreite/Halbtiefe
+// hängen von Y-Rotation ab (axis-aligned Bounding-Box-Projektion).
+const ROOM_MIN_X = 0;
+const ROOM_MAX_X = 5.52;
+const ROOM_MIN_Z = 0;
+const ROOM_MAX_Z = 3.89;
+
+function couchBounds(rotY: number) {
+  const cos = Math.abs(Math.cos(rotY));
+  const sin = Math.abs(Math.sin(rotY));
+  const effX = COUCH_HALF_X * cos + COUCH_HALF_Z * sin;
+  const effZ = COUCH_HALF_X * sin + COUCH_HALF_Z * cos;
+  return {
+    minX: ROOM_MIN_X + effX,
+    maxX: ROOM_MAX_X - effX,
+    minZ: ROOM_MIN_Z + effZ,
+    maxZ: ROOM_MAX_Z - effZ,
+  };
+}
 import { MaterialPicker } from './components/MaterialPicker';
 import { HelpOverlay } from './components/HelpOverlay';
 import { NavControls } from './components/NavControls';
@@ -84,7 +105,22 @@ export default function App() {
   const [couchVisible, setCouchVisible] = useState<boolean>(true);
   const [couchX, setCouchX] = useState<number>(2.7);
   const [couchZ, setCouchZ] = useState<number>(0.72);
-  const [couchRot, setCouchRot] = useState<number>(0);
+  const [couchRot, setCouchRotState] = useState<number>(0);
+
+  const couchBoundsMemo = useMemo(() => couchBounds(couchRot), [couchRot]);
+
+  const clampX = useCallback((x: number) => Math.max(couchBoundsMemo.minX, Math.min(couchBoundsMemo.maxX, x)), [couchBoundsMemo]);
+  const clampZ = useCallback((z: number) => Math.max(couchBoundsMemo.minZ, Math.min(couchBoundsMemo.maxZ, z)), [couchBoundsMemo]);
+
+  const handleCouchXChange = useCallback((x: number) => setCouchX(clampX(x)), [clampX]);
+  const handleCouchZChange = useCallback((z: number) => setCouchZ(clampZ(z)), [clampZ]);
+
+  const setCouchRot = useCallback((r: number) => {
+    setCouchRotState(r);
+    const b = couchBounds(r);
+    setCouchX((prev) => Math.max(b.minX, Math.min(b.maxX, prev)));
+    setCouchZ((prev) => Math.max(b.minZ, Math.min(b.maxZ, prev)));
+  }, []);
 
   const [variants, setVariants] = useState<Variant[]>(() => loadVariants());
   const [activeVariantId, setActiveVariantId] = useState<string | null>(null);
@@ -232,9 +268,10 @@ export default function App() {
         onColorChange={handleColorChange}
         onFloorSelect={handleFloorSelect}
         onFloorRotate={handleFloorRotate}
+        couchBounds={couchBoundsMemo}
         onCouchVisibleChange={setCouchVisible}
-        onCouchXChange={setCouchX}
-        onCouchZChange={setCouchZ}
+        onCouchXChange={handleCouchXChange}
+        onCouchZChange={handleCouchZChange}
         onCouchRotChange={setCouchRot}
         onSaveVariant={handleSaveVariant}
         onLoadVariant={handleLoadVariant}

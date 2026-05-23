@@ -9,6 +9,7 @@ type Props = {
   couchX: number;
   couchZ: number;
   couchRot: number;
+  couchBounds: { minX: number; maxX: number; minZ: number; maxZ: number };
   variants: Variant[];
   activeVariantId: string | null;
   onColorChange: (slotId: string, hex: string) => void;
@@ -26,7 +27,7 @@ type Props = {
 
 export function MaterialPicker({
   slotColors, activeFloorId, floorRotated,
-  couchVisible, couchX, couchZ, couchRot,
+  couchVisible, couchX, couchZ, couchRot, couchBounds,
   variants, activeVariantId,
   onColorChange, onFloorSelect, onFloorRotate,
   onCouchVisibleChange, onCouchXChange, onCouchZChange, onCouchRotChange,
@@ -220,7 +221,7 @@ export function MaterialPicker({
             <div className="slider-row">
               <label>Links ↔ Rechts</label>
               <input
-                type="range" min={-1} max={5.5} step={0.05}
+                type="range" min={couchBounds.minX} max={couchBounds.maxX} step={0.05}
                 value={couchX}
                 onChange={(e) => onCouchXChange(parseFloat(e.target.value))}
               />
@@ -229,7 +230,7 @@ export function MaterialPicker({
             <div className="slider-row">
               <label>Wand ↔ Raum</label>
               <input
-                type="range" min={-0.5} max={3.5} step={0.05}
+                type="range" min={couchBounds.minZ} max={couchBounds.maxZ} step={0.05}
                 value={couchZ}
                 onChange={(e) => onCouchZChange(parseFloat(e.target.value))}
               />

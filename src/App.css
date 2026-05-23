@@ -17,6 +17,7 @@ input { font-family: inherit; }
   grid-template-columns: 1fr 380px;
   height: 100vh;
   height: 100dvh;
+  height: var(--app-h, 100dvh);
   width: 100vw;
 }
 
@@ -32,7 +33,7 @@ input { font-family: inherit; }
   flex-direction: column;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-bottom: calc(40px + env(safe-area-inset-bottom, 0px));
 }
 
 .picker-header {

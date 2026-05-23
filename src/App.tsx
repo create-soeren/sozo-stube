@@ -97,6 +97,22 @@ export default function App() {
 
   const outdoorBackdrop = useMemo(() => createOutdoorBackdrop(), []);
 
+  // Echte Viewport-Höhe als CSS-Variable. 100dvh ist nicht in allen iOS-
+  // Versionen + Multitasking-Modi zuverlässig — window.innerHeight ist immer
+  // die tatsächlich sichtbare Höhe.
+  useEffect(() => {
+    const setAppHeight = () => {
+      document.documentElement.style.setProperty('--app-h', `${window.innerHeight}px`);
+    };
+    setAppHeight();
+    window.addEventListener('resize', setAppHeight);
+    window.addEventListener('orientationchange', setAppHeight);
+    return () => {
+      window.removeEventListener('resize', setAppHeight);
+      window.removeEventListener('orientationchange', setAppHeight);
+    };
+  }, []);
+
   const [slotColors, setSlotColors] = useState<Record<string, string>>(defaultColors);
   const [activeFloorId, setActiveFloorId] = useState<string | null>(null);
   const [floorRotated, setFloorRotated] = useState<boolean>(false);

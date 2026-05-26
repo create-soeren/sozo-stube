@@ -17,6 +17,27 @@ export type FloorTexture = {
 // Vinyl-Klicksystem hat eine einzige physische Strukturprägung (Plankenfugen + Maserung-Relief).
 // Alle Farbvarianten teilen dieselbe Diffuse+Normal-Basis, die Tönung kommt per Color-Tint.
 // Quelle: polyhaven.com/a/plank_flooring_02 (CC0), 2K JPG.
+// Wand-Texturen — Fotos der nackten Wände nach Tapeten-Entfernung.
+// 1:1-Mapping mit moderatem Tiling (1 Bild pro 3 m Welt) — Putz wirkt
+// kontinuierlich, sichtbare Wiederholung bleibt dezent.
+export type WallTexture = {
+  id: string;
+  name: string;
+  diffuse: string;       // Pfad zur diffuse map
+  hexFallback: string;   // Falls Texture nicht lädt: ungefährer Farb-Tint
+  metersPerRepeat: number;
+};
+
+export const wallTextures: WallTexture[] = [
+  {
+    id: 'nackte-wand',
+    name: 'Nackte Wand',
+    diffuse: `${import.meta.env.BASE_URL}textures/walls/nackte-wand/diffuse.jpg`,
+    hexFallback: '#C9B8A0',
+    metersPerRepeat: 3.0,
+  },
+];
+
 export const BASE_FLOOR_TEXTURE = {
   diffuse: `${import.meta.env.BASE_URL}textures/vinyl/_base/diffuse.jpg`,
   normal: `${import.meta.env.BASE_URL}textures/vinyl/_base/normal.jpg`,
@@ -302,6 +323,8 @@ export type Variant = {
   slotColors: Record<string, string>;
   activeFloorId: string | null;
   floorRotated: boolean;
+  // Wand-Slot → aktive Wand-Textur-ID (oder null = nur Farbe)
+  wallTextureBySlot: Record<string, string | null>;
   couchVisible: boolean;
   couchX: number;
   couchZ: number;
@@ -323,6 +346,7 @@ export function loadVariants(): Variant[] {
       slotColors: v.slotColors ?? {},
       activeFloorId: v.activeFloorId ?? null,
       floorRotated: v.floorRotated ?? false,
+      wallTextureBySlot: v.wallTextureBySlot ?? {},
       couchVisible: v.couchVisible ?? true,
       couchX: v.couchX ?? 2.7,
       couchZ: v.couchZ ?? 0.72,

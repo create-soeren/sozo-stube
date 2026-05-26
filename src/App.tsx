@@ -129,6 +129,19 @@ export default function App() {
   const [slotColors, setSlotColors] = useState<Record<string, string>>(defaultColors);
   const [activeFloorId, setActiveFloorId] = useState<string | null>(null);
   const [floorRotated, setFloorRotated] = useState<boolean>(false);
+  // Pro Wand-Slot: aktive Wand-Textur-ID oder null (=nur Farbe)
+  const [wallTextureBySlot, setWallTextureBySlot] = useState<Record<string, string | null>>({});
+
+  const handleWallTextureSelect = useCallback((slotId: string, textureId: string | null) => {
+    setWallTextureBySlot((prev) => {
+      if (textureId === null) {
+        const next = { ...prev };
+        delete next[slotId];
+        return next;
+      }
+      return { ...prev, [slotId]: textureId };
+    });
+  }, []);
 
   // Couch initial mittig an Nord-Wand (Boden X-Range 0..5.52, Z-Range 0..3.89)
   // Nord-Wand bei Z≈0, Couch-Tiefe 1,44 m → Mitte bei Z=0.72
@@ -239,6 +252,7 @@ export default function App() {
       slotColors,
       activeFloorId,
       floorRotated,
+      wallTextureBySlot,
       couchVisible,
       couchX,
       couchZ,
@@ -247,7 +261,7 @@ export default function App() {
     };
     setVariants((prev) => [...prev, variant]);
     setActiveVariantId(variant.id);
-  }, [slotColors, activeFloorId, floorRotated, couchVisible, couchX, couchZ, couchRot, regal]);
+  }, [slotColors, activeFloorId, floorRotated, wallTextureBySlot, couchVisible, couchX, couchZ, couchRot, regal]);
 
   const handleLoadVariant = useCallback((id: string) => {
     const v = variants.find((x) => x.id === id);
@@ -255,6 +269,7 @@ export default function App() {
     setSlotColors(v.slotColors);
     setActiveFloorId(v.activeFloorId);
     setFloorRotated(v.floorRotated);
+    setWallTextureBySlot(v.wallTextureBySlot ?? {});
     setCouchVisible(v.couchVisible ?? true);
     setCouchX(v.couchX);
     setCouchZ(v.couchZ);
@@ -281,6 +296,7 @@ export default function App() {
     setSlotColors(defaultColors);
     setActiveFloorId(null);
     setFloorRotated(false);
+    setWallTextureBySlot({});
     setCouchVisible(true);
     setCouchX(2.7);
     setCouchZ(0.72);
@@ -353,6 +369,7 @@ export default function App() {
             slotColors={slotColors}
             activeFloorId={activeFloorId}
             floorRotated={floorRotated}
+            wallTextureBySlot={wallTextureBySlot}
           />
           {couchVisible && <Couch position={[couchX, 0, couchZ]} rotationY={couchRot} />}
           <Regal state={regal} />
@@ -365,6 +382,8 @@ export default function App() {
         slotColors={slotColors}
         activeFloorId={activeFloorId}
         floorRotated={floorRotated}
+        wallTextureBySlot={wallTextureBySlot}
+        onWallTextureSelect={handleWallTextureSelect}
         couchVisible={couchVisible}
         couchX={couchX}
         couchZ={couchZ}

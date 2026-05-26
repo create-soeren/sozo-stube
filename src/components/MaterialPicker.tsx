@@ -3,6 +3,7 @@ import {
   materialSlots,
   wallColorPalettes,
   floorTextures,
+  wallTextures,
   regalWoodMaterials,
   regalBracketMaterials,
   REGAL_MAX_ROWS,
@@ -21,6 +22,8 @@ type Props = {
   slotColors: Record<string, string>;
   activeFloorId: string | null;
   floorRotated: boolean;
+  wallTextureBySlot: Record<string, string | null>;
+  onWallTextureSelect: (slotId: string, textureId: string | null) => void;
   couchVisible: boolean;
   couchX: number;
   couchZ: number;
@@ -51,6 +54,7 @@ type Props = {
 
 export function MaterialPicker({
   slotColors, activeFloorId, floorRotated,
+  wallTextureBySlot, onWallTextureSelect,
   couchVisible, couchX, couchZ, couchRot, couchBounds,
   variants, activeVariantId,
   regal,
@@ -83,6 +87,8 @@ export function MaterialPicker({
 
   const activeSlotConfig = materialSlots.find((s) => s.slotId === activeSlot)!;
   const showFloorOptions = activeSlotConfig.category === 'boden';
+  const showWallTextureOptions = activeSlotConfig.category === 'wand';
+  const activeWallTextureId = wallTextureBySlot[activeSlot] ?? null;
 
   return (
     <aside className="picker">
@@ -167,6 +173,38 @@ export function MaterialPicker({
             className="hex-text"
           />
         </div>
+
+        {showWallTextureOptions && (
+          <div className="palette-block">
+            <div className="floor-header">
+              <h4>Wandtextur</h4>
+              {activeWallTextureId && (
+                <button
+                  className="floor-clear-btn"
+                  onClick={() => onWallTextureSelect(activeSlot, null)}
+                  title="Textur entfernen, nur Farbe"
+                >
+                  Textur aus
+                </button>
+              )}
+            </div>
+            <div className="floor-grid">
+              {wallTextures.map((wt) => (
+                <button
+                  key={wt.id}
+                  className={`floor-tile ${activeWallTextureId === wt.id ? 'active' : ''}`}
+                  style={{
+                    background: `url(${wt.diffuse}) center/cover, ${wt.hexFallback}`,
+                  }}
+                  onClick={() => onWallTextureSelect(activeSlot, wt.id)}
+                  title={wt.name}
+                >
+                  <span className="floor-name">{wt.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {showFloorOptions ? (
           <div className="palette-block">

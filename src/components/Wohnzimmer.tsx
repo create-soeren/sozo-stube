@@ -1,7 +1,7 @@
 import { useGLTF } from '@react-three/drei';
 import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
-import { BASE_FLOOR_TEXTURE } from '../data/materials';
+import { BASE_FLOOR_TEXTURE, wallTextures } from '../data/materials';
 
 // Prozedurale Klicksystem-Vinyl-Textur.
 // Layout: 2 horizontale Reihen × 5 Planken — Reihe 2 halb versetzt (klassisches
@@ -122,12 +122,17 @@ type Props = {
   slotColors: Record<string, string>;
   activeFloorId: string | null;
   floorRotated: boolean;
+  wallTextureBySlot: Record<string, string | null>;
 };
 
 const GLASS_SLOTS = new Set(['fenster_glas', 'tuer_loggia_glas']);
 const FLOOR_SLOT = 'boden';
+const WALL_SLOTS = new Set([
+  'wand_nord', 'wand_ost', 'wand_sued', 'wand_west',
+  'wand_erker_sued', 'wand_erker_west', 'wand_erker_front',
+]);
 
-export function Wohnzimmer({ modelPath, slotColors, activeFloorId, floorRotated }: Props) {
+export function Wohnzimmer({ modelPath, slotColors, activeFloorId, floorRotated, wallTextureBySlot }: Props) {
   const { scene } = useGLTF(modelPath);
 
   const floorDiffuse = useMemo(() => createPlankDiffuse(), []);
@@ -139,6 +144,35 @@ export function Wohnzimmer({ modelPath, slotColors, activeFloorId, floorRotated 
       tex.center.set(0.5, 0.5);
     });
   }, [floorDiffuse, floorAO]);
+
+  // Wand-Texturen lazy laden (eine Map pro Texture-ID).
+  const wallTextureMap = useMemo(() => {
+    const loader = new THREE.TextureLoader();
+    const map = new Map<string, THREE.Texture>();
+    wallTextures.forEach((wt) => {
+      const tex = loader.load(wt.diffuse);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      tex.anisotropy = 8;
+      // metersPerRepeat 3 → repeat 1/3 pro Welt-Meter (in UV-Generierung mit
+      // Welt-Koord multipliziert mit diesem Faktor wirken)
+      map.set(wt.id, tex);
+    });
+    return map;
+  }, []);
+
+  // Schnellzugriff: aktive Wand-Texture pro Slot
+  const activeWallTextureBySlot = useMemo(() => {
+    const m = new Map<string, { tex: THREE.Texture; metersPerRepeat: number }>();
+    Object.entries(wallTextureBySlot).forEach(([slotId, texId]) => {
+      if (!texId) return;
+      const tex = wallTextureMap.get(texId);
+      const def = wallTextures.find((wt) => wt.id === texId);
+      if (tex && def) m.set(slotId, { tex, metersPerRepeat: def.metersPerRepeat });
+    });
+    return m;
+  }, [wallTextureBySlot, wallTextureMap]);
 
 
   const cloned = useMemo(() => {
@@ -206,6 +240,42 @@ export function Wohnzimmer({ modelPath, slotColors, activeFloorId, floorRotated 
     });
   }, [cloned, floorRotated]);
 
+  // UVs für Wand-Meshes aus Welt-Position generieren.
+  // Welt-Achse für U wird per Face-Normal bestimmt:
+  // Normal ~Z (Wand Nord/Süd) → U = X, V = Y
+  // Normal ~X (Wand Ost/West) → U = Z, V = Y
+  // Erker (schräg, Normal X+Z) → U = max(|X|,|Z|)-Achse, V = Y (leichte
+  // Verzerrung akzeptabel)
+  // Multiplikation mit (1/metersPerRepeat) erzeugt das Tiling.
+  useEffect(() => {
+    cloned.traverse((obj) => {
+      if (!(obj as THREE.Mesh).isMesh) return;
+      const mesh = obj as THREE.Mesh;
+      const matName = Array.isArray(mesh.material)
+        ? (mesh.material[0] as THREE.Material & { name?: string }).name
+        : (mesh.material as THREE.Material & { name?: string })?.name;
+      if (!matName || !WALL_SLOTS.has(matName)) return;
+      const slotConf = activeWallTextureBySlot.get(matName);
+      if (!slotConf) return;
+      const geom = mesh.geometry as THREE.BufferGeometry;
+      const pos = geom.attributes.position;
+      const norm = geom.attributes.normal;
+      if (!pos || !norm) return;
+      const scale = 1 / slotConf.metersPerRepeat;
+      const nx = Math.abs(norm.getX(0));
+      const nz = Math.abs(norm.getZ(0));
+      const useX = nz >= nx; // Normal Z dominant → U-Achse = X
+      const uvs = new Float32Array(pos.count * 2);
+      for (let i = 0; i < pos.count; i++) {
+        const u = useX ? pos.getX(i) : pos.getZ(i);
+        const v = pos.getY(i);
+        uvs[i * 2] = u * scale;
+        uvs[i * 2 + 1] = v * scale;
+      }
+      geom.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+    });
+  }, [cloned, activeWallTextureBySlot]);
+
   useEffect(() => {
     cloned.traverse((obj) => {
       if (!(obj as THREE.Mesh).isMesh) return;
@@ -233,6 +303,22 @@ export function Wohnzimmer({ modelPath, slotColors, activeFloorId, floorRotated 
           return;
         }
 
+        if (WALL_SLOTS.has(mat.name)) {
+          const wallTex = activeWallTextureBySlot.get(mat.name);
+          if (wallTex) {
+            std.map = wallTex.tex;
+            // Color als weißer Multiplier — Textur unverfälscht durchreichen
+            std.color.set('#FFFFFF');
+            std.roughness = 0.85;
+            std.metalness = 0;
+          } else {
+            std.map = null;
+            if (hex && std.color) std.color.set(hex);
+          }
+          std.needsUpdate = true;
+          return;
+        }
+
         if (hex && std.color) {
           std.color.set(hex);
           std.needsUpdate = true;
@@ -244,7 +330,7 @@ export function Wohnzimmer({ modelPath, slotColors, activeFloorId, floorRotated 
         updateMat(mesh.material as THREE.Material);
       }
     });
-  }, [cloned, slotColors, activeFloorId, floorDiffuse, floorAO]);
+  }, [cloned, slotColors, activeFloorId, floorDiffuse, floorAO, activeWallTextureBySlot]);
 
   return <primitive object={cloned} />;
 }

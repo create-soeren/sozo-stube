@@ -3,6 +3,7 @@ import { Canvas } from '@react-three/fiber';
 import * as THREE from 'three';
 import { Wohnzimmer } from './components/Wohnzimmer';
 import { Couch, COUCH_HALF_X, COUCH_HALF_Z } from './components/Couch';
+import { Regal } from './components/Regal';
 import { TouchDPad } from './components/TouchDPad';
 
 // Boden-Bounds (aus GLB-Inspektion): X 0..5.52, Z 0..3.89.
@@ -28,7 +29,19 @@ function couchBounds(rotY: number) {
 import { MaterialPicker } from './components/MaterialPicker';
 import { HelpOverlay } from './components/HelpOverlay';
 import { NavControls } from './components/NavControls';
-import { materialSlots, loadVariants, saveVariants, type Variant } from './data/materials';
+import {
+  materialSlots,
+  loadVariants,
+  saveVariants,
+  defaultRegalState,
+  defaultRow,
+  defaultRowHeights,
+  WAND_NORD_LENGTH_M,
+  REGAL_MAX_ROWS,
+  REGAL_LENGTH_MIN_M,
+  type Variant,
+  type RegalState,
+} from './data/materials';
 import './App.css';
 
 // Außen-Backdrop: Wolkenweiß → Himmelsblau → Baum-Grün, weicher Blur.
@@ -139,6 +152,77 @@ export default function App() {
     setCouchZ((prev) => Math.max(b.minZ, Math.min(b.maxZ, prev)));
   }, []);
 
+  // Regale (an Wand Nord, 5,52 m)
+  const [regal, setRegal] = useState<RegalState>(() => defaultRegalState());
+
+  const handleRegalRowCountChange = useCallback((nextCount: number) => {
+    const clamped = Math.max(0, Math.min(REGAL_MAX_ROWS, Math.round(nextCount)));
+    setRegal((prev) => {
+      const defaults = defaultRowHeights(clamped);
+      const newRows = Array.from({ length: clamped }, (_, i) =>
+        prev.rows[i] ?? defaultRow(defaults[i])
+      );
+      return { ...prev, rowCount: clamped, rows: newRows };
+    });
+  }, []);
+
+  const handleRegalDepthChange = useCallback((depthM: number) => {
+    setRegal((prev) => ({ ...prev, depthM }));
+  }, []);
+
+  const handleRegalWoodChange = useCallback((id: string) => {
+    setRegal((prev) => ({ ...prev, woodMaterialId: id }));
+  }, []);
+
+  const handleRegalBracketChange = useCallback((id: string) => {
+    setRegal((prev) => ({ ...prev, bracketMaterialId: id }));
+  }, []);
+
+  const handleRegalRowHeightChange = useCallback((index: number, heightM: number) => {
+    setRegal((prev) => {
+      const next = [...prev.rows];
+      next[index] = { ...next[index], heightM };
+      return { ...prev, rows: next };
+    });
+  }, []);
+
+  const handleRegalRowEdgeChange = useCallback(
+    (index: number, side: 'left' | 'right', newEdgeX: number) => {
+      setRegal((prev) => {
+        const row = prev.rows[index];
+        if (!row) return prev;
+        const oldLeft = row.xCenterM - row.lengthM / 2;
+        const oldRight = row.xCenterM + row.lengthM / 2;
+        let newLeft = side === 'left' ? newEdgeX : oldLeft;
+        let newRight = side === 'right' ? newEdgeX : oldRight;
+        // Wand-Grenzen
+        newLeft = Math.max(0, newLeft);
+        newRight = Math.min(WAND_NORD_LENGTH_M, newRight);
+        // Mindest-Länge erzwingen, ohne die gegenüberliegende Kante zu verschieben
+        if (side === 'left' && newRight - newLeft < REGAL_LENGTH_MIN_M) {
+          newLeft = newRight - REGAL_LENGTH_MIN_M;
+        } else if (side === 'right' && newRight - newLeft < REGAL_LENGTH_MIN_M) {
+          newRight = newLeft + REGAL_LENGTH_MIN_M;
+        }
+        const newLength = newRight - newLeft;
+        const newCenter = (newLeft + newRight) / 2;
+        const next = [...prev.rows];
+        next[index] = { ...row, lengthM: newLength, xCenterM: newCenter };
+        return { ...prev, rows: next };
+      });
+    },
+    []
+  );
+
+  const handleRegalRowReset = useCallback((index: number) => {
+    setRegal((prev) => {
+      const defaults = defaultRowHeights(prev.rowCount);
+      const next = [...prev.rows];
+      next[index] = defaultRow(defaults[index]);
+      return { ...prev, rows: next };
+    });
+  }, []);
+
   const [variants, setVariants] = useState<Variant[]>(() => loadVariants());
   const [activeVariantId, setActiveVariantId] = useState<string | null>(null);
 
@@ -159,10 +243,11 @@ export default function App() {
       couchX,
       couchZ,
       couchRot,
+      regal,
     };
     setVariants((prev) => [...prev, variant]);
     setActiveVariantId(variant.id);
-  }, [slotColors, activeFloorId, floorRotated, couchVisible, couchX, couchZ, couchRot]);
+  }, [slotColors, activeFloorId, floorRotated, couchVisible, couchX, couchZ, couchRot, regal]);
 
   const handleLoadVariant = useCallback((id: string) => {
     const v = variants.find((x) => x.id === id);
@@ -174,6 +259,7 @@ export default function App() {
     setCouchX(v.couchX);
     setCouchZ(v.couchZ);
     setCouchRot(v.couchRot);
+    setRegal(v.regal ?? defaultRegalState());
     setActiveVariantId(v.id);
   }, [variants]);
 
@@ -199,6 +285,7 @@ export default function App() {
     setCouchX(2.7);
     setCouchZ(0.72);
     setCouchRot(0);
+    setRegal(defaultRegalState());
   }, [defaultColors]);
 
   const handleFloorRotate = useCallback(() => {
@@ -268,6 +355,7 @@ export default function App() {
             floorRotated={floorRotated}
           />
           {couchVisible && <Couch position={[couchX, 0, couchZ]} rotationY={couchRot} />}
+          <Regal state={regal} />
           <NavControls />
         </Canvas>
         <HelpOverlay />
@@ -291,6 +379,14 @@ export default function App() {
         onCouchXChange={handleCouchXChange}
         onCouchZChange={handleCouchZChange}
         onCouchRotChange={setCouchRot}
+        regal={regal}
+        onRegalRowCountChange={handleRegalRowCountChange}
+        onRegalDepthChange={handleRegalDepthChange}
+        onRegalWoodChange={handleRegalWoodChange}
+        onRegalBracketChange={handleRegalBracketChange}
+        onRegalRowHeightChange={handleRegalRowHeightChange}
+        onRegalRowEdgeChange={handleRegalRowEdgeChange}
+        onRegalRowReset={handleRegalRowReset}
         onSaveVariant={handleSaveVariant}
         onLoadVariant={handleLoadVariant}
         onDeleteVariant={handleDeleteVariant}

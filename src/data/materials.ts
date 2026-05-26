@@ -207,6 +207,95 @@ export const floorTextures: FloorTexture[] = [
   },
 ];
 
+// Regale — Holzbretter mit Winkeln an Wand Nord (5,52 m).
+// Reihen vom Boden zur Decke (0..7), pro Reihe Höhe + Länge + X-Position
+// individuell. Bretttiefe ist ein globaler Parameter (gilt für alle Bretter).
+
+export const WAND_NORD_LENGTH_M = 5.52;
+export const REGAL_MAX_ROWS = 7;
+export const REGAL_HEIGHT_MIN_M = 0.20;
+export const REGAL_HEIGHT_MAX_M = 3.10;
+export const REGAL_DEPTH_MIN_M = 0.15;
+export const REGAL_DEPTH_MAX_M = 0.40;
+export const REGAL_DEPTH_DEFAULT_M = 0.25;
+export const REGAL_LENGTH_MIN_M = 0.30;
+
+export type RegalRow = {
+  heightM: number;    // Brett-Oberkante über Boden
+  lengthM: number;    // Brett-Länge
+  xCenterM: number;   // Brett-Mitte entlang Wand Nord
+};
+
+export type RegalState = {
+  rowCount: number;
+  rows: RegalRow[];
+  depthM: number;
+  woodMaterialId: string;
+  bracketMaterialId: string;
+};
+
+export type RegalWoodMaterial = { id: string; name: string; hex: string };
+export const regalWoodMaterials: RegalWoodMaterial[] = [
+  { id: 'eiche-hell',  name: 'Eiche hell',      hex: '#D4B896' },
+  { id: 'eiche-natur', name: 'Eiche natur',     hex: '#B68B5A' },
+  { id: 'nuss',        name: 'Nuss',            hex: '#5C3A24' },
+  { id: 'schwarz',     name: 'Schwarz lackiert',hex: '#1A1A1A' },
+  { id: 'weiss',       name: 'Weiß lackiert',   hex: '#F0EFE8' },
+  { id: 'natur',       name: 'Naturholz',       hex: '#C9A572' },
+];
+
+export type RegalBracketMaterial = {
+  id: string;
+  name: string;
+  hex: string;
+  type: 'metall' | 'holz';
+  metalness?: number;
+  roughness?: number;
+};
+// metalness reduziert, weil ohne Environment-Map metalness=1.0 schwarz
+// rendert (keine Umgebung zum Reflektieren). Mit metalness 0.4–0.7 wird
+// die diffuse Color-Komponente sichtbar, dazu kommt etwas Specular.
+export const regalBracketMaterials: RegalBracketMaterial[] = [
+  { id: 'metall-schwarz',   name: 'Schwarz matt', hex: '#1F1F1F', type: 'metall', metalness: 0.4, roughness: 0.55 },
+  { id: 'metall-messing',   name: 'Messing',      hex: '#C9A05F', type: 'metall', metalness: 0.6, roughness: 0.35 },
+  { id: 'metall-edelstahl', name: 'Edelstahl',    hex: '#C8C8CC', type: 'metall', metalness: 0.6, roughness: 0.32 },
+  { id: 'metall-weiss',     name: 'Weiß matt',    hex: '#E8E5DC', type: 'metall', metalness: 0.10, roughness: 0.70 },
+  { id: 'holz-eiche-hell',  name: 'Holz: Eiche hell',  hex: '#D4B896', type: 'holz' },
+  { id: 'holz-eiche-natur', name: 'Holz: Eiche natur', hex: '#B68B5A', type: 'holz' },
+  { id: 'holz-nuss',        name: 'Holz: Nuss',        hex: '#5C3A24', type: 'holz' },
+];
+
+// Default-Reihenhöhen: erste Reihe bei 120 cm, dann 40 cm Schritte aufwärts.
+// Würde die letzte Reihe REGAL_HEIGHT_MAX_M (3,10 m) überschreiten, wird der
+// Schritt zusammengezogen — die letzte Reihe sitzt dann exakt am Maximum.
+export function defaultRowHeights(count: number): number[] {
+  if (count <= 0) return [];
+  const first = 1.20;
+  const targetStep = 0.40;
+  if (count === 1) return [first];
+  const maxStep = (REGAL_HEIGHT_MAX_M - first) / (count - 1);
+  const step = Math.min(targetStep, maxStep);
+  return Array.from({ length: count }, (_, i) => first + i * step);
+}
+
+export function defaultRow(heightM: number): RegalRow {
+  return {
+    heightM,
+    lengthM: WAND_NORD_LENGTH_M,
+    xCenterM: WAND_NORD_LENGTH_M / 2,
+  };
+}
+
+export function defaultRegalState(): RegalState {
+  return {
+    rowCount: 0,
+    rows: [],
+    depthM: REGAL_DEPTH_DEFAULT_M,
+    woodMaterialId: 'eiche-natur',
+    bracketMaterialId: 'metall-schwarz',
+  };
+}
+
 export type Variant = {
   id: string;
   name: string;
@@ -217,6 +306,7 @@ export type Variant = {
   couchX: number;
   couchZ: number;
   couchRot: number;
+  regal: RegalState;
 };
 
 const STORAGE_KEY = 'wohnung-viewer-variants';
@@ -224,7 +314,21 @@ const STORAGE_KEY = 'wohnung-viewer-variants';
 export function loadVariants(): Variant[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as Variant[]) : [];
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as Partial<Variant>[];
+    // Migration: alte Varianten ohne Regal-Feld bekommen Defaults
+    return parsed.map((v) => ({
+      id: v.id ?? `v-${Math.random()}`,
+      name: v.name ?? 'Unbenannt',
+      slotColors: v.slotColors ?? {},
+      activeFloorId: v.activeFloorId ?? null,
+      floorRotated: v.floorRotated ?? false,
+      couchVisible: v.couchVisible ?? true,
+      couchX: v.couchX ?? 2.7,
+      couchZ: v.couchZ ?? 0.72,
+      couchRot: v.couchRot ?? 0,
+      regal: v.regal ?? defaultRegalState(),
+    }));
   } catch {
     return [];
   }

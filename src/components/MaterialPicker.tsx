@@ -1,5 +1,21 @@
 import { useState } from 'react';
-import { materialSlots, wallColorPalettes, floorTextures, type SlotConfig, type Variant } from '../data/materials';
+import {
+  materialSlots,
+  wallColorPalettes,
+  floorTextures,
+  regalWoodMaterials,
+  regalBracketMaterials,
+  REGAL_MAX_ROWS,
+  REGAL_HEIGHT_MIN_M,
+  REGAL_HEIGHT_MAX_M,
+  REGAL_DEPTH_MIN_M,
+  REGAL_DEPTH_MAX_M,
+  REGAL_LENGTH_MIN_M,
+  WAND_NORD_LENGTH_M,
+  type SlotConfig,
+  type Variant,
+  type RegalState,
+} from '../data/materials';
 
 type Props = {
   slotColors: Record<string, string>;
@@ -12,6 +28,7 @@ type Props = {
   couchBounds: { minX: number; maxX: number; minZ: number; maxZ: number };
   variants: Variant[];
   activeVariantId: string | null;
+  regal: RegalState;
   onColorChange: (slotId: string, hex: string) => void;
   onFloorSelect: (floorId: string | null, hex: string) => void;
   onFloorRotate: () => void;
@@ -19,6 +36,13 @@ type Props = {
   onCouchXChange: (x: number) => void;
   onCouchZChange: (z: number) => void;
   onCouchRotChange: (r: number) => void;
+  onRegalRowCountChange: (n: number) => void;
+  onRegalDepthChange: (d: number) => void;
+  onRegalWoodChange: (id: string) => void;
+  onRegalBracketChange: (id: string) => void;
+  onRegalRowHeightChange: (index: number, heightM: number) => void;
+  onRegalRowEdgeChange: (index: number, side: 'left' | 'right', xEdge: number) => void;
+  onRegalRowReset: (index: number) => void;
   onSaveVariant: () => void;
   onLoadVariant: (id: string) => void;
   onDeleteVariant: (id: string) => void;
@@ -29,13 +53,18 @@ export function MaterialPicker({
   slotColors, activeFloorId, floorRotated,
   couchVisible, couchX, couchZ, couchRot, couchBounds,
   variants, activeVariantId,
+  regal,
   onColorChange, onFloorSelect, onFloorRotate,
   onCouchVisibleChange, onCouchXChange, onCouchZChange, onCouchRotChange,
+  onRegalRowCountChange, onRegalDepthChange, onRegalWoodChange, onRegalBracketChange,
+  onRegalRowHeightChange, onRegalRowEdgeChange, onRegalRowReset,
   onSaveVariant, onLoadVariant, onDeleteVariant,
   onReset,
 }: Props) {
   const [activeSlot, setActiveSlot] = useState<string>(materialSlots[0].slotId);
   const [couchOpen, setCouchOpen] = useState<boolean>(false);
+  const [regalOpen, setRegalOpen] = useState<boolean>(false);
+  const [openRowIndex, setOpenRowIndex] = useState<number | null>(null);
 
   const groups = materialSlots.reduce<Record<string, SlotConfig[]>>((acc, s) => {
     (acc[s.category] ||= []).push(s);
@@ -245,6 +274,161 @@ export function MaterialPicker({
               />
               <span className="slider-val">{Math.round((couchRot * 180) / Math.PI)}°</span>
             </div>
+          </div>
+        )}
+      </div>
+
+      <div className="regal-block">
+        <button
+          className="couch-toggle"
+          onClick={() => setRegalOpen((o) => !o)}
+          aria-expanded={regalOpen}
+        >
+          <span>Regale (Wand Nord)</span>
+          <span className="couch-chevron">{regalOpen ? '▾' : '▸'}</span>
+        </button>
+        {regalOpen && (
+          <div className="couch-body">
+            <div className="stepper-row">
+              <label>Anzahl Reihen</label>
+              <div className="stepper-controls">
+                <button
+                  className="stepper-btn"
+                  onClick={() => onRegalRowCountChange(regal.rowCount - 1)}
+                  disabled={regal.rowCount <= 0}
+                  aria-label="Eine Reihe entfernen"
+                >−</button>
+                <span className="stepper-val">{regal.rowCount}</span>
+                <button
+                  className="stepper-btn"
+                  onClick={() => onRegalRowCountChange(regal.rowCount + 1)}
+                  disabled={regal.rowCount >= REGAL_MAX_ROWS}
+                  aria-label="Eine Reihe hinzufügen"
+                >+</button>
+              </div>
+            </div>
+
+            <div className="slider-row">
+              <label>Tiefe (alle)</label>
+              <input
+                type="range"
+                min={REGAL_DEPTH_MIN_M}
+                max={REGAL_DEPTH_MAX_M}
+                step={0.01}
+                value={regal.depthM}
+                onChange={(e) => onRegalDepthChange(parseFloat(e.target.value))}
+              />
+              <span className="slider-val">{Math.round(regal.depthM * 100)} cm</span>
+            </div>
+
+            <div className="regal-mat-block">
+              <h5>Brett-Material</h5>
+              <div className="regal-mat-grid">
+                {regalWoodMaterials.map((w) => (
+                  <button
+                    key={w.id}
+                    className={`regal-mat-tile ${regal.woodMaterialId === w.id ? 'active' : ''}`}
+                    style={{ background: w.hex }}
+                    onClick={() => onRegalWoodChange(w.id)}
+                    title={w.name}
+                  >
+                    <span className="regal-mat-name">{w.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="regal-mat-block">
+              <h5>Winkel-Material</h5>
+              <div className="regal-mat-grid">
+                {regalBracketMaterials.map((b) => (
+                  <button
+                    key={b.id}
+                    className={`regal-mat-tile ${regal.bracketMaterialId === b.id ? 'active' : ''}`}
+                    style={{ background: b.hex }}
+                    onClick={() => onRegalBracketChange(b.id)}
+                    title={b.name}
+                  >
+                    <span className="regal-mat-name">{b.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {regal.rowCount > 0 && (
+              <div className="regal-rows-block">
+                <h5>Reihen</h5>
+                <div className="regal-rows-list">
+                  {regal.rows.slice(0, regal.rowCount).map((row, i) => {
+                    const isOpen = openRowIndex === i;
+                    const xLeft = row.xCenterM - row.lengthM / 2;
+                    const xRight = row.xCenterM + row.lengthM / 2;
+                    return (
+                      <div key={i} className={`regal-row ${isOpen ? 'open' : ''}`}>
+                        <button
+                          className="regal-row-header"
+                          onClick={() => setOpenRowIndex(isOpen ? null : i)}
+                          aria-expanded={isOpen}
+                        >
+                          <span className="regal-row-title">Reihe {i + 1}</span>
+                          <span className="regal-row-summary">
+                            {Math.round(row.heightM * 100)} cm hoch · {Math.round(row.lengthM * 100)} cm lang
+                          </span>
+                          <span className="couch-chevron">{isOpen ? '▾' : '▸'}</span>
+                        </button>
+                        {isOpen && (
+                          <div className="regal-row-body">
+                            <div className="slider-row">
+                              <label>Höhe</label>
+                              <input
+                                type="range"
+                                min={REGAL_HEIGHT_MIN_M}
+                                max={REGAL_HEIGHT_MAX_M}
+                                step={0.01}
+                                value={row.heightM}
+                                onChange={(e) => onRegalRowHeightChange(i, parseFloat(e.target.value))}
+                              />
+                              <span className="slider-val">{Math.round(row.heightM * 100)} cm</span>
+                            </div>
+                            <div className="slider-row">
+                              <label>Links-Kante</label>
+                              <input
+                                type="range"
+                                min={0}
+                                max={Math.max(0, xRight - REGAL_LENGTH_MIN_M)}
+                                step={0.01}
+                                value={xLeft}
+                                onChange={(e) => onRegalRowEdgeChange(i, 'left', parseFloat(e.target.value))}
+                              />
+                              <span className="slider-val">{xLeft.toFixed(2)} m</span>
+                            </div>
+                            <div className="slider-row">
+                              <label>Rechts-Kante</label>
+                              <input
+                                type="range"
+                                min={Math.min(WAND_NORD_LENGTH_M, xLeft + REGAL_LENGTH_MIN_M)}
+                                max={WAND_NORD_LENGTH_M}
+                                step={0.01}
+                                value={xRight}
+                                onChange={(e) => onRegalRowEdgeChange(i, 'right', parseFloat(e.target.value))}
+                              />
+                              <span className="slider-val">{xRight.toFixed(2)} m</span>
+                            </div>
+                            <button
+                              className="regal-row-reset"
+                              onClick={() => onRegalRowReset(i)}
+                              title="Diese Reihe auf Default-Position zurücksetzen"
+                            >
+                              Reset
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -235,7 +235,8 @@ export const floorTextures: FloorTexture[] = [
 export const WAND_NORD_LENGTH_M = 5.52;
 export const REGAL_MAX_ROWS = 7;
 export const REGAL_HEIGHT_MIN_M = 0.20;
-export const REGAL_HEIGHT_MAX_M = 3.10;
+// Raumhöhe 3,07 m, Brett-Dicke 2 cm, Sicherheitsabstand zur Decke 10 cm
+export const REGAL_HEIGHT_MAX_M = 2.95;
 export const REGAL_DEPTH_MIN_M = 0.15;
 export const REGAL_DEPTH_MAX_M = 0.40;
 export const REGAL_DEPTH_DEFAULT_M = 0.25;
